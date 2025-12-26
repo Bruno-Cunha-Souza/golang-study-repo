@@ -13,6 +13,11 @@ type Card struct {
 }
 
 func creditCardValidator(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var card Card
 	err := json.NewDecoder(r.Body).Decode(&card)
 	if err != nil {
@@ -20,16 +25,21 @@ func creditCardValidator(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isValid := luhn.LuhnAlgorithm(card.Number)
-	response := map[string]bool{"valid": isValid}
+	isValid, err := luhn.LuhnAlgorithm(card.Number)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(map[string]bool{"valid": isValid})
 }
 
 func main() {
-	args := os.Args
-	port := args[1]
+	port := "8080"
+	if len(os.Args) > 1 {
+		port = os.Args[1]
+	}
 
 	http.HandleFunc("/", creditCardValidator)
 	fmt.Println("Listening on port:", port)

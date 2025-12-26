@@ -1,10 +1,22 @@
 package handlers
 
 import (
+	"errors"
 	"taskmanager/db"
 	"taskmanager/models"
 	"time"
 )
+
+var (
+	ErrTaskNotFound  = errors.New("tarefa não encontrada")
+	ErrInvalidStatus = errors.New("status inválido. Use: pendente, em_progresso, concluida")
+)
+
+var validStatuses = map[string]bool{
+	"pendente":     true,
+	"em_progresso": true,
+	"concluida":    true,
+}
 
 func AddTask(title, description string, deadline time.Time) error {
 	task := models.Task{
@@ -12,8 +24,6 @@ func AddTask(title, description string, deadline time.Time) error {
 		Description: description,
 		Status:      "pendente",
 		Deadline:    deadline,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 	return db.DB.Create(&task).Error
 }
@@ -25,9 +35,25 @@ func ListTasks() ([]models.Task, error) {
 }
 
 func UpdateTaskStatus(id uint, status string) error {
-	return db.DB.Model(&models.Task{}).Where("id = ?", id).Update("status", status).Error
+	if !validStatuses[status] {
+		return ErrInvalidStatus
+	}
+
+	var task models.Task
+	result := db.DB.First(&task, id)
+	if result.Error != nil {
+		return ErrTaskNotFound
+	}
+
+	return db.DB.Model(&task).Update("status", status).Error
 }
 
 func DeleteTask(id uint) error {
-	return db.DB.Delete(&models.Task{}, id).Error
+	var task models.Task
+	result := db.DB.First(&task, id)
+	if result.Error != nil {
+		return ErrTaskNotFound
+	}
+
+	return db.DB.Delete(&task).Error
 }
